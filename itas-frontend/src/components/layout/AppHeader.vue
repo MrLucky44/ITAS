@@ -16,7 +16,10 @@
           <RouterLink to="/dashboard" class="hover:text-blue-600 transition-colors">Dashboard</RouterLink>
           <RouterLink to="/profile" class="hover:text-blue-600 transition-colors">Profile</RouterLink>
 
-          <span class="text-gray-600 text-sm">Hi, {{ auth.user?.name || auth.user?.email }}</span>
+          <span class="text-gray-600 text-sm">
+  Hi, {{ auth.user?.name || auth.user?.email }}
+  <span v-if="auth.user?.role" class="ml-1 text-gray-400">({{ auth.user.role }})</span>
+</span>
           <button
             @click="onLogout"
             class="px-3 py-1 border rounded hover:bg-red-500 hover:text-white transition-colors"

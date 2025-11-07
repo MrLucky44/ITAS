@@ -38,6 +38,7 @@ import helmet from "helmet"
 import cors from "cors"
 import cookieParser from "cookie-parser"
 import authRoutes from "./routes.auth.js"
+import devRoutes from "./routes.dev.js"
 
 // NEW: admin helpers
 import fs from "fs"
@@ -46,6 +47,7 @@ import jwt from "jsonwebtoken"
 import { fileURLToPath } from "url"
 import { requireRole } from "./utils.role.js"
 import { findUserById, updateUserById } from "./db.js"
+
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -110,6 +112,7 @@ createTransporter().then((t) => {
 
 // routes
 app.use("/api/auth", authRoutes)
+app.use("/api/dev", devRoutes)
 
 app.get("/api/health", (req, res) =>
   res.json({ ok: true, time: new Date().toISOString() })
@@ -127,92 +130,7 @@ app.get("/api/dev/port", (req, res) => {
  * GET /api/admin/role-action?token=...
  * Token is signed & time-limited; no auth header required.
  */
-app.get("/api/admin/role-action", async (req, res) => {
-  // prevent 304 caching
-  res.set({
-    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-    "Pragma": "no-cache",
-    "Expires": "0",
-    "Surrogate-Control": "no-store",
-  })
 
-  const token = req.query.token
-  if (!token) {
-    return res.status(400).send(renderHtml("Hatalı istek", "Token bulunamadı."))
-  }
-
-  try {
-    const payload = verifyRoleActionToken(token) // { sub, act, req, iat, exp }
-    const user = findUserById(payload.sub)
-    if (!user) {
-      return res.status(404).send(renderHtml("Bulunamadı", "Kullanıcı bulunamadı."))
-    }
-
-    const t = req.app.locals.transporter
-    if (!t) console.error("[SMTP] transporter not available at role-action")
-
-    console.log("[ROLE-ACTION] act=%s req=%s user=%s", payload.act, payload.req, user.email)
-
-    if (payload.act === "approve") {
-      const newRole = payload.req
-      updateUserById(user.id, { role: newRole, requestedRole: null, approved: true })
-
-      if (t) {
-        try {
-          const info = await t.sendMail({
-            from: process.env.SMTP_FROM || `ITAS Support <${process.env.SMTP_USER}>`,
-            to: user.email, // <<< send to the USER
-            subject: "ITAS Rolünüz Onaylandı",
-            text: `Merhaba ${user.name || ""}, talep ettiğiniz '${payload.req}' rolünüz onaylandı.`,
-            headers: { "X-ITAS": "role-approved" },
-          })
-          console.log("[APPROVAL MAIL SENT] to=%s id=%s accepted=%j resp=%s",
-            user.email, info.messageId, info.accepted, info.response)
-        } catch (e) {
-          console.error("[APPROVAL MAIL ERROR]", e?.response || e?.message || e)
-        }
-      }
-
-      return res.status(200).send(
-        renderHtml(
-          "Onaylandı ✅",
-          `Kullanıcı <b>${escapeHtml(user.email)}</b> artık <b>${escapeHtml(newRole)}</b> olarak onaylandı.`
-        )
-      )
-    }
-
-    if (payload.act === "deny") {
-      updateUserById(user.id, { requestedRole: null, approved: false })
-
-      if (t) {
-        try {
-          const info = await t.sendMail({
-            from: process.env.SMTP_FROM || `ITAS Support <${process.env.SMTP_USER}>`,
-            to: user.email, // <<< send to the USER
-            subject: "ITAS Rol Talebiniz Reddedildi",
-            text: `Merhaba ${user.name || ""}, talep ettiğiniz '${payload.req}' rolünüz reddedildi.`,
-            headers: { "X-ITAS": "role-denied" },
-          })
-          console.log("[DENY MAIL SENT] to=%s id=%s accepted=%j resp=%s",
-            user.email, info.messageId, info.accepted, info.response)
-        } catch (e) {
-          console.error("[DENY MAIL ERROR]", e?.response || e?.message || e)
-        }
-      }
-
-      return res.status(200).send(
-        renderHtml(
-          "Reddedildi ❌",
-          `Kullanıcı <b>${escapeHtml(user.email)}</b> rol talebi reddedildi.`
-        )
-      )
-    }
-
-    return res.status(400).send(renderHtml("Hatalı istek", "Geçersiz işlem."))
-  } catch (e) {
-    return res.status(400).send(renderHtml("Token Geçersiz", "Bağlantı süresi dolmuş veya geçersiz."))
-  }
-})
 /* ---------------- Admin: role approval list & actions (UI) ---------------- */
 
 // List pending role requests (users with requestedRole and not approved)
