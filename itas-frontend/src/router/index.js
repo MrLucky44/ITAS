@@ -8,6 +8,8 @@ import ResetPage from "@/pages/ResetPage.vue"
 import TwoFASetupPage from "@/pages/TwoFASetupPage.vue"
 import { useAuthStore } from "@/stores/auth"
 
+const PendingApprovalPage = () => import("@/pages/PendingApproval.vue") // lazy
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -16,6 +18,7 @@ const router = createRouter({
     { path: "/forgot", name: "forgot", component: ForgotPage },
     { path: "/reset", name: "reset", component: ResetPage },
     { path: "/twofa-setup", name: "twofa-setup", component: TwoFASetupPage },
+    { path: "/pending-approval", name: "pending-approval", component: PendingApprovalPage,},
     { path: "/", redirect: "/dashboard" },
     { path: "/dashboard", name: "dashboard", component: DashboardPage, meta: { requiresAuth: true } },
     { path: "/profile", name: "profile", component: ProfilePage, meta: { requiresAuth: true } },
@@ -25,12 +28,41 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
+
+  // 1) Auth-only routes
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: "login", query: { redirect: to.fullPath } }
   }
-  // Force 2FA setup if logged in but not completed
-  if (auth.isAuthenticated && auth.user?.twoFASetupRequired && to.name !== "twofa-setup") {
+
+  // 2) If 2FA is ALREADY enabled, do not allow lingering on setup page
+  if (
+    auth.isAuthenticated &&
+    to.name === "twofa-setup" &&
+    auth.user?.twoFAEnabled === true &&
+    auth.user?.twoFASetupRequired === false
+  ) {
+    return { name: "dashboard" }
+  }
+
+  // 3) Mandatory 2FA setup first (forces user into setup page)
+  if (
+    auth.isAuthenticated &&
+    auth.user?.twoFASetupRequired === true &&
+    to.name !== "twofa-setup"
+  ) {
     return { name: "twofa-setup" }
+  }
+
+  // 4) Unified inspection gate: block everything until approved
+  //    (Allow a short bypass list so user can see profile/twofa/pending)
+  const bypass = new Set(["twofa-setup", "pending-approval", "profile"])
+  if (
+    auth.isAuthenticated &&
+    auth.user &&
+    auth.user.approved === false &&
+    !bypass.has(to.name)
+  ) {
+    return { name: "pending-approval" }
   }
 })
 

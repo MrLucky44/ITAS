@@ -10,3 +10,6 @@
 <script setup>
 import AppHeader from "@/components/layout/AppHeader.vue"
 </script>
+<style>
+*{margin:0;padding:0}
+</style>

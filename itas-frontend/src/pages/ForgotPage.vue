@@ -5,7 +5,7 @@
       <p class="text-sm text-gray-500 mb-4">E-posta adresini gir; sıfırlama bağlantısı gönderiyoruz.</p>
       <input v-model="email" type="email" class="w-full border rounded-lg p-2.5 mb-3" placeholder="ornek@itas.com" />
       <button class="w-full rounded-lg bg-gray-900 text-white py-2.5" @click="send">Gönder</button>
-      <p v-if="done" class="text-sm text-green-600 mt-3">Eğer kayıtlıysa e-postana link gönderdik (geliştirmede konsola yazdırıyoruz).</p>
+      <p v-if="done" class="text-sm text-green-600 mt-3">Eğer kayıtlıysa e-postana link gönderdik.</p>
       <p v-if="auth.error" class="text-sm text-red-600 mt-2">{{ auth.error }}</p>
     </div>
   </section>
